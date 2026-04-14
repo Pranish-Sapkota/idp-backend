@@ -1,0 +1,32 @@
+# render.yaml
+# ─────────────────────────────────────────────────────────────────
+# Render Blueprint for IDP System Backend
+# Deploy: https://dashboard.render.com → "New Blueprint Instance"
+# ─────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: idp-system-backend
+    runtime: python
+    region: oregon                   # Change to your preferred region
+    plan: free                       # Upgrade to "starter" for production
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false                  # Set manually in Render dashboard
+
+      - key: APP_ENV
+        value: production
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      - key: MAX_FILE_SIZE_MB
+        value: "20"
+
+      # Optional: enable Groq fallback
+      # - key: GROQ_API_KEY
+      #   sync: false
