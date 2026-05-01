@@ -1,30 +1,26 @@
-# ─────────────────────────────────────────
-# IDP System – Backend Dependencies
-# Tested & compatible set (Render-safe)
-# ─────────────────────────────────────────
+# Core backend
+fastapi==0.110.0
+uvicorn==0.29.0
 
-# Web framework
-fastapi==0.115.5
-uvicorn[standard]==0.32.1
+# Data validation
+pydantic==2.6.4
+pydantic-core==2.16.3
 
-# Async HTTP client (Gemini calls)
-httpx==0.27.2
-
-# File parsing
-PyMuPDF==1.24.13          # PDF → fitz
-python-docx==1.1.2         # .docx
-openpyxl==3.1.5            # .xlsx engine
-pandas==2.2.3              # .xlsx tabular data
-python-pptx==1.0.2         # .pptx
-
-# AI SDK
-google-generativeai==0.8.3
-
-# Utilities
-python-multipart==0.0.12   # FastAPI file uploads
+# Environment variables
 python-dotenv==1.0.1
-pydantic==2.10.3
-pydantic-settings==2.6.1
-tiktoken==0.8.0            # Token-aware chunking
-tenacity==9.0.0            # Retry logic
-loguru==0.7.2              # Structured logging
+
+# HTTP requests
+requests==2.31.0
+
+# Google Gemini API client
+google-generativeai==0.5.2
+
+# OCR (optional, for document parsing)
+pytesseract==0.3.10
+Pillow==10.3.0
+
+# PDF handling (optional, if you process PDFs)
+PyPDF2==3.0.1
+
+# Extra utilities
+numpy==1.26.4
