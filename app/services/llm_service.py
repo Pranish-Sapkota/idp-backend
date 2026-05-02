@@ -1,18 +1,10 @@
 """
 app/services/llm_service.py
 ────────────────────────────
-Gemini API integration for all three IDP tasks:
-  - Summarization
-  - Question Answering
-  - Structured Key-Information Extraction
-
-Architecture:
-  - Primary:  Google Gemini (gemini-1.5-flash / gemini-1.5-pro)
+Gemini API integration using the new google-genai SDK (v1 endpoint).
+  - Primary:  Google Gemini 2.0 Flash
   - Fallback: Groq (llama-3.1-70b) if GROQ_API_KEY is set
   - Retry:    tenacity (3 attempts, exponential backoff)
-
-Handles multi-chunk documents by processing chunks in parallel
-and then synthesising results into a final answer.
 """
 
 from __future__ import annotations
@@ -23,30 +15,31 @@ import re
 import time
 from typing import Any
 
-import google.generativeai as genai
 import httpx
+from google import genai
+from google.genai import types
 from loguru import logger
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 from app.config import get_settings
-from app.models import TaskType, OutputFormat
+from app.models import OutputFormat, TaskType
 
 
-# ── Gemini client initialisation ──────────────────────────────────────────────
+# ── Gemini client ─────────────────────────────────────────────────────────────
 
-def _init_gemini() -> None:
+def _get_client() -> genai.Client:
     settings = get_settings()
     if not settings.gemini_api_key:
         raise RuntimeError(
             "GEMINI_API_KEY is not configured. "
             "Set it in your .env file or Render environment variables."
         )
-    genai.configure(api_key=settings.gemini_api_key)
+    return genai.Client(api_key=settings.gemini_api_key)
 
 
 # ── Prompt Templates ──────────────────────────────────────────────────────────
@@ -68,7 +61,6 @@ Document Content:
 
 Summary:"""
 
-
 QA_PROMPT = """\
 You are an expert document analyst. Answer the following question using ONLY the information \
 provided in the document content below. If the answer cannot be found, say so clearly.
@@ -81,7 +73,6 @@ Document Content:
 ─────────────────
 
 Answer (cite relevant sections where possible):"""
-
 
 EXTRACT_PROMPT = """\
 You are an expert information extraction system. Extract structured key information from \
@@ -113,7 +104,6 @@ Document Content:
 
 JSON Output:"""
 
-
 SYNTHESIS_PROMPT = """\
 You are synthesising partial analyses of different sections of a large document.
 
@@ -136,19 +126,19 @@ Do not repeat duplicate information. Be concise and well-structured."""
     reraise=True,
 )
 async def _call_gemini(prompt: str, use_pro: bool = False) -> str:
-    """Single async Gemini call with retry logic."""
+    """Single async Gemini call with retry logic using the new google-genai SDK."""
     settings = get_settings()
     model_name = settings.gemini_model_pro if use_pro else settings.gemini_model
 
+    client = _get_client()
     loop = asyncio.get_event_loop()
-    model = genai.GenerativeModel(model_name)
 
-    # Run the blocking SDK call in a thread pool
     response = await loop.run_in_executor(
         None,
-        lambda: model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
+        lambda: client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
                 temperature=0.2,
                 max_output_tokens=4096,
             ),
@@ -164,7 +154,7 @@ async def _call_gemini(prompt: str, use_pro: bool = False) -> str:
 # ── Fallback: Groq ────────────────────────────────────────────────────────────
 
 async def _call_groq(prompt: str) -> str:
-    """Groq fallback using httpx async client (llama-3.1-70b-versatile)."""
+    """Groq fallback using httpx async client."""
     settings = get_settings()
     if not settings.groq_api_key:
         raise RuntimeError("GROQ_API_KEY not configured for fallback.")
@@ -189,17 +179,11 @@ async def _call_groq(prompt: str) -> str:
 
 
 async def _call_llm(prompt: str, use_pro: bool = False) -> tuple[str, str]:
-    """
-    Try Gemini first, fall back to Groq on failure.
-
-    Returns:
-        (response_text, model_name_used)
-    """
+    """Try Gemini first, fall back to Groq on failure."""
     settings = get_settings()
     model_label = settings.gemini_model_pro if use_pro else settings.gemini_model
 
     try:
-        _init_gemini()
         result = await _call_gemini(prompt, use_pro=use_pro)
         return result, model_label
     except Exception as gemini_err:
@@ -221,21 +205,16 @@ async def _process_chunk(
     question: str | None,
     extraction_schema: dict | None,
 ) -> str:
-    """Process a single text chunk for the given task."""
     if task == TaskType.SUMMARIZE:
         prompt = SUMMARIZE_PROMPT.format(text=chunk)
-
     elif task == TaskType.QA:
         if not question:
             raise ValueError("A question is required for the QA task.")
         prompt = QA_PROMPT.format(question=question, text=chunk)
-
     elif task == TaskType.EXTRACT:
         schema_hint = ""
         if extraction_schema:
-            schema_hint = (
-                f"Use this schema as a guide:\n{json.dumps(extraction_schema, indent=2)}\n"
-            )
+            schema_hint = f"Use this schema as a guide:\n{json.dumps(extraction_schema, indent=2)}\n"
         prompt = EXTRACT_PROMPT.format(text=chunk, schema_hint=schema_hint)
     else:
         raise ValueError(f"Unknown task: {task}")
@@ -244,14 +223,13 @@ async def _process_chunk(
     return result
 
 
-# ── Synthesis for multi-chunk docs ────────────────────────────────────────────
+# ── Synthesis ─────────────────────────────────────────────────────────────────
 
 async def _synthesise(
     partial_results: list[str],
     task: TaskType,
     question: str | None,
 ) -> tuple[str, str]:
-    """Merge partial chunk results into one final answer."""
     numbered = "\n\n".join(
         f"--- Section {i + 1} ---\n{r}" for i, r in enumerate(partial_results)
     )
@@ -268,17 +246,14 @@ async def _synthesise(
         partial_results=numbered,
         output_type=output_type,
     )
-    return await _call_llm(prompt, use_pro=True)  # Use Pro for synthesis
+    return await _call_llm(prompt, use_pro=True)
 
 
 # ── JSON Post-processing ──────────────────────────────────────────────────────
 
 def _extract_json(text: str) -> dict[str, Any]:
-    """Attempt to parse JSON from LLM output, stripping markdown fences."""
-    # Strip ```json ... ``` or ``` ... ```
     clean = re.sub(r"```(?:json)?\s*", "", text)
     clean = re.sub(r"```", "", clean).strip()
-    # Find the first { ... } block
     match = re.search(r"\{.*\}", clean, re.DOTALL)
     if match:
         return json.loads(match.group())
@@ -294,36 +269,20 @@ async def process_document(
     output_format: OutputFormat = OutputFormat.MARKDOWN,
     extraction_schema: dict | None = None,
 ) -> tuple[str | dict[str, Any], str]:
-    """
-    Main entry point for LLM processing.
-
-    Args:
-        chunks:            Token-bounded text chunks from the document.
-        task:              summarize | qa | extract
-        question:          User question (for QA only).
-        output_format:     Desired output format.
-        extraction_schema: Optional JSON schema hint for extraction.
-
-    Returns:
-        (result, model_used)
-    """
     start = time.perf_counter()
     logger.info(f"LLM processing: task={task.value}, chunks={len(chunks)}")
 
-    # ── Single chunk: direct processing ──────────────────────────────────────
     if len(chunks) == 1:
         result_text, model_used = await _call_llm(
             _build_prompt(chunks[0], task, question, extraction_schema)
         )
     else:
-        # ── Multi-chunk: parallel processing + synthesis ──────────────────────
         partial_tasks = [
             _process_chunk(chunk, task, question, extraction_schema)
             for chunk in chunks
         ]
         partial_results = await asyncio.gather(*partial_tasks, return_exceptions=True)
 
-        # Filter out errors (log them)
         valid_results: list[str] = []
         for i, res in enumerate(partial_results):
             if isinstance(res, Exception):
@@ -342,11 +301,9 @@ async def process_document(
     elapsed_ms = (time.perf_counter() - start) * 1000
     logger.success(f"LLM processing done in {elapsed_ms:.0f}ms using {model_used}")
 
-    # ── Format output ─────────────────────────────────────────────────────────
     if task == TaskType.EXTRACT:
         try:
-            parsed = _extract_json(result_text)
-            return parsed, model_used
+            return _extract_json(result_text), model_used
         except Exception as exc:
             logger.warning(f"JSON parse failed for extraction result: {exc}")
             return result_text, model_used
@@ -360,7 +317,6 @@ def _build_prompt(
     question: str | None,
     extraction_schema: dict | None,
 ) -> str:
-    """Build prompt for single-chunk case."""
     if task == TaskType.SUMMARIZE:
         return SUMMARIZE_PROMPT.format(text=text)
     elif task == TaskType.QA:
@@ -368,8 +324,6 @@ def _build_prompt(
     elif task == TaskType.EXTRACT:
         schema_hint = ""
         if extraction_schema:
-            schema_hint = (
-                f"Use this schema as a guide:\n{json.dumps(extraction_schema, indent=2)}\n"
-            )
+            schema_hint = f"Use this schema as a guide:\n{json.dumps(extraction_schema, indent=2)}\n"
         return EXTRACT_PROMPT.format(text=text, schema_hint=schema_hint)
     raise ValueError(f"Unknown task: {task}")
