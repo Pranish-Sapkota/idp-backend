@@ -10,8 +10,8 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # ── AI Keys ───────────────────────────────────────────────────────────────
-    gemini_api_key: str = "AIzaSyDI5FINx9bnccKW3lBDy9_2ueIUxDvDKOw"
-    groq_api_key: str = "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"
+    gemini_api_key: str = ""
+    groq_api_key: str = ""
 
     # ── App Behaviour ─────────────────────────────────────────────────────────
     app_env: str = "production"
@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # ── Gemini Model Config ───────────────────────────────────────────────────
-    gemini_model: str = "gemini-1.5-flash"      # ← removed -latest suffix
-    gemini_model_pro: str = "gemini-1.5-pro"    # ← this one was already correct
+    gemini_model: str = "gemini-2.0-flash"        # Fast, cost-effective, v1 API
+    gemini_model_pro: str = "gemini-2.0-flash"    # Use same model for synthesis
 
     # ── Chunking Config ───────────────────────────────────────────────────────
     chunk_size_tokens: int = 1500
