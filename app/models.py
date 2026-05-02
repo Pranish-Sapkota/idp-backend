@@ -2,15 +2,12 @@
 app/models.py
 ─────────────
 Pydantic request / response models for the IDP API.
-All I/O is strictly typed for validation and OpenAPI docs.
 """
 
 from enum import Enum
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-
-# ── Enumerations ──────────────────────────────────────────────────────────────
 
 class TaskType(str, Enum):
     SUMMARIZE = "summarize"
@@ -24,28 +21,12 @@ class OutputFormat(str, Enum):
     MARKDOWN = "markdown"
 
 
-# ── Request Models ────────────────────────────────────────────────────────────
-
 class ProcessRequest(BaseModel):
-    task: TaskType = Field(
-        default=TaskType.SUMMARIZE,
-        description="Processing task to perform on the document."
-    )
-    question: str | None = Field(
-        default=None,
-        description="Question to answer (required when task=qa)."
-    )
-    output_format: OutputFormat = Field(
-        default=OutputFormat.MARKDOWN,
-        description="Desired output format."
-    )
-    extraction_schema: dict[str, Any] | None = Field(
-        default=None,
-        description="JSON schema hint for structured extraction (optional)."
-    )
+    task: TaskType = Field(default=TaskType.SUMMARIZE)
+    question: str | None = Field(default=None)
+    output_format: OutputFormat = Field(default=OutputFormat.MARKDOWN)
+    extraction_schema: dict[str, Any] | None = Field(default=None)
 
-
-# ── Response Models ───────────────────────────────────────────────────────────
 
 class DocumentMeta(BaseModel):
     filename: str
@@ -57,6 +38,9 @@ class DocumentMeta(BaseModel):
 
 
 class ProcessResponse(BaseModel):
+    # Suppress Pydantic's warning about fields starting with "model_"
+    model_config = ConfigDict(protected_namespaces=())
+
     success: bool
     task: TaskType
     document: DocumentMeta
