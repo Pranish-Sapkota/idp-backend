@@ -24,13 +24,14 @@ def parse_pdf(content: bytes) -> tuple[str, int]:
     try:
         import fitz  # PyMuPDF
         doc = fitz.open(stream=content, filetype="pdf")
+        page_count = len(doc)          # ← capture BEFORE close()
         pages: list[str] = []
         for page_num, page in enumerate(doc):
             text = page.get_text("text")
             if text.strip():
                 pages.append(f"[Page {page_num + 1}]\n{text.strip()}")
         doc.close()
-        return "\n\n".join(pages), len(doc)
+        return "\n\n".join(pages), page_count
     except Exception as exc:
         logger.error(f"PDF parsing failed: {exc}")
         raise ValueError(f"Could not parse PDF: {exc}") from exc
@@ -48,7 +49,6 @@ def parse_docx(content: bytes) -> tuple[str, None]:
         # Body paragraphs
         for para in doc.paragraphs:
             if para.text.strip():
-                # Preserve heading level hints
                 if para.style.name.startswith("Heading"):
                     paragraphs.append(f"\n## {para.text.strip()}\n")
                 else:
@@ -84,11 +84,12 @@ def parse_xlsx(content: bytes) -> tuple[str, None]:
             if df.empty:
                 continue
 
-            # Convert to readable markdown-style table
             header = " | ".join(str(c) for c in df.columns)
             separator = " | ".join(["---"] * len(df.columns))
             rows = [" | ".join(str(v) for v in row) for _, row in df.iterrows()]
-            table_text = f"### Sheet: {sheet_name}\n{header}\n{separator}\n" + "\n".join(rows)
+            table_text = (
+                f"### Sheet: {sheet_name}\n{header}\n{separator}\n" + "\n".join(rows)
+            )
             sheet_texts.append(table_text)
 
         return "\n\n".join(sheet_texts), None
