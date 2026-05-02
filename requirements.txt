@@ -10,7 +10,7 @@ pydantic-settings==2.5.2
 # ── Environment Variables ─────────────────────────────────────────────────────
 python-dotenv==1.0.1
 
-# ── Form / File upload support (required by FastAPI for Form + UploadFile) ────
+# ── Form / File upload support ────────────────────────────────────────────────
 python-multipart==0.0.9
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -25,8 +25,8 @@ tenacity==8.5.0
 # ── Tokenisation ─────────────────────────────────────────────────────────────
 tiktoken==0.7.0
 
-# ── Google Gemini ─────────────────────────────────────────────────────────────
-google-generativeai==0.7.2
+# ── Google Gemini (new unified SDK — uses stable v1 API, not deprecated v1beta)
+google-genai==1.16.0
 
 # ── Document Parsing ──────────────────────────────────────────────────────────
 PyMuPDF==1.24.10
