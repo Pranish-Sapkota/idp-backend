@@ -2,7 +2,6 @@
 app/config.py
 ─────────────
 Centralised settings loaded from environment variables.
-Uses pydantic-settings for validation and type safety.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,9 +9,9 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # ── AI Keys ──────────────────────────────────────────────────────────────
-    gemini_api_key: str = ""
-    groq_api_key: str = ""
+    # ── AI Keys ───────────────────────────────────────────────────────────────
+    gemini_api_key: str = "AIzaSyDI5FINx9bnccKW3lBDy9_2ueIUxDvDKOw"
+    groq_api_key: str = "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"
 
     # ── App Behaviour ─────────────────────────────────────────────────────────
     app_env: str = "production"
@@ -20,13 +19,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # ── Gemini Model Config ───────────────────────────────────────────────────
-    gemini_model: str = "gemini-1.5-flash-latest"          # Fast & cost-effective
-    gemini_model_pro: str = "gemini-1.5-pro"        # Higher quality fallback
+    gemini_model: str = "gemini-1.5-flash"      # ← removed -latest suffix
+    gemini_model_pro: str = "gemini-1.5-pro"    # ← this one was already correct
 
     # ── Chunking Config ───────────────────────────────────────────────────────
     chunk_size_tokens: int = 1500
     chunk_overlap_tokens: int = 150
-    max_chunks_per_request: int = 10               # Avoid Gemini rate limits
+    max_chunks_per_request: int = 10
 
     # ── Supported MIME types ──────────────────────────────────────────────────
     supported_extensions: list[str] = [
