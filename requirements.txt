@@ -4,11 +4,14 @@ uvicorn[standard]==0.30.6
 
 # ── Data Validation & Settings ────────────────────────────────────────────────
 pydantic==2.9.2
-pydantic-core==2.23.4             # Has pre-built wheels for Python 3.12
+pydantic-core==2.23.4
 pydantic-settings==2.5.2
 
 # ── Environment Variables ─────────────────────────────────────────────────────
 python-dotenv==1.0.1
+
+# ── Form / File upload support (required by FastAPI for Form + UploadFile) ────
+python-multipart==0.0.9
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 loguru==0.7.2
@@ -26,11 +29,11 @@ tiktoken==0.7.0
 google-generativeai==0.7.2
 
 # ── Document Parsing ──────────────────────────────────────────────────────────
-PyMuPDF==1.24.10                  # fitz — PDF parsing
-python-docx==1.1.2                # .docx parsing
-pandas==2.2.3                     # .xlsx parsing
-openpyxl==3.1.5                   # pandas Excel engine
-python-pptx==1.0.2                # .pptx parsing
+PyMuPDF==1.24.10
+python-docx==1.1.2
+pandas==2.2.3
+openpyxl==3.1.5
+python-pptx==1.0.2
 
 # ── Misc ──────────────────────────────────────────────────────────────────────
 requests==2.32.3
